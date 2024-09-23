@@ -1,5 +1,4 @@
 import json
-from bson import ObjectId
 from vendedor import listar_vendedor
 
 def listar_produtos(db):
@@ -16,61 +15,73 @@ def listar_produtos(db):
 
     return produtos
 
-
 def create_produto(db):
     mycol_produto = db.produto
-    mycol_vendedor = db.vendedor
 
     print("\nInserindo um novo produto")
 
-
-    # Listar e selecionar um vendedor
     vendedor = listar_vendedor(db)
     if not vendedor:
-        print("Nenhum vendedor disponível. Produto não pode ser criado sem um vendedor.")
         return
     
-    # Coletar os dados do produto
     nome = input("Nome: ")
     descricao = input("Descrição: ")
     preco = input("Preço: ")
     quantidade = input("Quantidade: ")
 
-    # Criar o documento do produto com a associação ao vendedor
     produto = {
         "nome": nome,
         "descricao": descricao,
         "preco": preco,
         "quantidade": quantidade,
-        "vendedor_id": vendedor["_id"],  # Associando o ID do vendedor
-        "vendedor_nome": f"{vendedor['nome']} {vendedor['sobrenome']}"  # Nome do vendedor
+        "vendedor_id": vendedor["_id"],  
+        "vendedor_nome": f"{vendedor['nome']} {vendedor['sobrenome']}" 
     }
 
-    # Inserir o produto no banco de dados
+    
     x = mycol_produto.insert_one(produto)
     print(f"Produto inserido com sucesso. ID: {x.inserted_id}")
 
-def read_produto(db, nome=None):
+def read_produto(db):
     mycol_produto = db.produto
+    mycol_vendedor = db.vendedor
 
-    print("\nProdutos existentes: ")
-    if not nome:
-        produtos = mycol_produto.find().sort("nome")
-        for produto in produtos:
-            print(f"{produto['nome']} - Nome do vendedor: {produto['vendedor_nome']}")
-    else:
-        myquery = {"nome": nome}
-        produtos = mycol_produto.find(myquery)
-        if produtos.count() == 0:
-            print("Nenhum produto encontrado.")
-        else:
-            for produto in produtos:
-                print(f"{produto['nome']} -  Nome do vendedor: {produto['vendedor_nome']}")
+    produtos = list(mycol_produto.find())
+    if not produtos:
+        print("Nenhum produto encontrado.")
+        return
+
+    print("\nLista de produtos:")
+    for i, produto in enumerate(produtos, 1):
+        vendedor = mycol_vendedor.find_one({"_id": produto["vendedor_id"]})
+        vendedor_nome = f"{vendedor['nome']} {vendedor['sobrenome']}" if vendedor else "Desconhecido"
+        
+        print(f"{i}. {produto['nome']} - Nome do vendedor: {vendedor_nome}")
+
+    while True:
+        try:
+            escolha = int(input("Digite o número do produto que deseja selecionar: "))
+            if 1 <= escolha <= len(produtos):
+                produto_selecionado = produtos[escolha - 1]
+                break
+            else:
+                print("Número inválido. Tente novamente.")
+        except ValueError:
+            print("Entrada inválida. Digite um número.")
+
+    vendedor = mycol_vendedor.find_one({"_id": produto_selecionado["vendedor_id"]})
+    vendedor_nome = f"{vendedor['nome']} {vendedor['sobrenome']}" if vendedor else "Desconhecido"
+
+    produto_selecionado['_id'] = str(produto_selecionado['_id'])
+    produto_selecionado['vendedor_id'] = str(produto_selecionado['vendedor_id'])
+    produto_selecionado['vendedor_nome'] = vendedor_nome
+
+    print("\nDados do produto selecionado:")
+    print(json.dumps(produto_selecionado, indent=4))
 
 def update_produto(db):
     mycol_produto = db.produto
 
-    # Listar produtos com índice
     produtos = listar_produtos(db)
     if not produtos:
         return
@@ -93,8 +104,7 @@ def update_produto(db):
         print("1. Alterar Nome")
         print("2. Alterar Descrição")
         print("3. Alterar Quantidade")
-        print("4. Alterar Vendedor")
-        print("5. Sair")
+        print("4. Sair")
 
         opcao = input("Digite o número da opção: ")
 
@@ -117,27 +127,17 @@ def update_produto(db):
                 print("Quantidade atualizada.")
 
         elif opcao == "4":
-            print("\nListando vendedores disponíveis para alteração:")
-            vendedor = listar_vendedor(db)
-            if vendedor:
-                produto_selecionado["vendedor_id"] = vendedor["_id"]
-                produto_selecionado["vendedor_nome"] = f"{vendedor['nome']} {vendedor['sobrenome']}"
-                print("Vendedor atualizado.")
-
-        elif opcao == "5":
             break
 
         else:
             print("Opção inválida. Tente novamente.")
 
-    # Atualizar os dados no banco de dados
     myquery = {"_id": produto_selecionado["_id"]}
     newvalues = {"$set": produto_selecionado}
     mycol_produto.update_one(myquery, newvalues)
     print("Produto atualizado com sucesso.")
 
 def delete_produto(db):
-    # Listar produtos com índice
     produtos = listar_produtos(db)
     if not produtos:
         print("Nenhum produto disponível para exclusão.")

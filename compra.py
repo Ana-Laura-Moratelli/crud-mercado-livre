@@ -1,10 +1,14 @@
-import json
-from bson import ObjectId
 from produto import listar_produtos
+from usuario import listar_usuarios
 
-def comprar(db):
+def create_compra(db):
     mycol_compra = db.compra
     mycol_produto = db.produto
+
+    # Selecionar usuário
+    usuario = listar_usuarios(db)
+    if not usuario:
+        return  # Nenhum usuário selecionado
 
     # Listar produtos para selecionar
     produtos = listar_produtos(db)
@@ -23,34 +27,58 @@ def comprar(db):
         except ValueError:
             print("Entrada inválida. Digite um número.")
 
-    # Coletar dados da compra
-    quantidade = input("Quantidade: ")
+    # Verificar se o produto tem estoque suficiente
+    quantidade_estoque = int(produto_selecionado["quantidade"])
+
+    while True:
+        try:
+            quantidade = int(input(f"Quantidade (disponível: {quantidade_estoque}): "))
+            if quantidade > quantidade_estoque:
+                print(f"Estoque insuficiente. Apenas {quantidade_estoque} unidades disponíveis.")
+            elif quantidade <= 0:
+                print("Quantidade inválida. Digite um valor maior que zero.")
+            else:
+                break
+        except ValueError:
+            print("Entrada inválida. Digite um número.")
+
     estado = input("Estado: ")
     data_compra = input("Data da compra: ")
 
-    # Criar documento da compra
     compra = {
-        "produto_id": produto_selecionado["_id"],  # Associar o ID do produto
+        "usuario_id": usuario["_id"], 
+        "produto_id": produto_selecionado["_id"], 
         "quantidade": quantidade,
         "estado": estado,
         "data_compra": data_compra
     }
 
-    # Inserir a compra no banco de dados
     x = mycol_compra.insert_one(compra)
-    print(f"Compra registrada com sucesso. ID: {x.inserted_id}")
 
+    nova_quantidade = quantidade_estoque - quantidade
+    mycol_produto.update_one(
+        {"_id": produto_selecionado["_id"]},
+        {"$set": {"quantidade": nova_quantidade}}
+    )
+
+    print(f"Compra registrada com sucesso. ID: {x.inserted_id}")
+    print(f"Estoque atualizado. Quantidade restante: {nova_quantidade}")
 
 def listar_compras(db):
     mycol_compra = db.compra
     mycol_produto = db.produto
 
-    compras = list(mycol_compra.find())
+    
+    usuario = listar_usuarios(db)
+    if not usuario:
+        return  
+
+    compras = list(mycol_compra.find({"usuario_id": usuario["_id"]}))
     if not compras:
-        print("Nenhuma compra registrada.")
+        print(f"Nenhuma compra registrada para o usuário {usuario['nome']}.")
         return
 
-    print("\nLista de compras:")
+    print(f"\nLista de compras para o usuário {usuario['nome']}:")
     for compra in compras:
         produto = mycol_produto.find_one({"_id": compra["produto_id"]})
         produto_nome = produto["nome"] if produto else "Desconhecido"

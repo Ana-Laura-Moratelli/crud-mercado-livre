@@ -1,8 +1,6 @@
 import json
-from bson import ObjectId
 
 def listar_usuarios(db):
-    # Listar usuários
     mycol = db.usuario
     usuarios = list(mycol.find())
 
@@ -18,14 +16,13 @@ def listar_usuarios(db):
         try:
             escolha = int(input("Digite o número do usuário que deseja selecionar: "))
             if 1 <= escolha <= len(usuarios):
-                return usuarios[escolha - 1]  # Retorna o usuário selecionado
+                return usuarios[escolha - 1] 
             else:
                 print("Número inválido. Tente novamente.")
         except ValueError:
             print("Entrada inválida. Digite um número.")
 
 def create_usuario(db):
-    # Inserir
     mycol = db.usuario
     print("\nInserindo um novo usuário")
     
@@ -104,14 +101,12 @@ def read_usuario(db):
         except ValueError:
             print("Entrada inválida. Digite um número.")
 
-    # Convertendo o ObjectId para string para poder imprimir em JSON
     usuario_selecionado['_id'] = str(usuario_selecionado['_id'])
 
     print("Dados do usuário selecionado:")
     print(json.dumps(usuario_selecionado, indent=4))
 
 def update_usuario(db):
-    # Atualizar usuário por índice
     usuario = listar_usuarios(db)
     if not usuario:
         return
@@ -155,16 +150,22 @@ def update_usuario(db):
     print("Dados atualizados com sucesso.")
 
 def delete_usuario(db):
-    # Deletar usuário por índice
     usuario = listar_usuarios(db)
     if not usuario:
         return
 
-    mycol = db.usuario
+    mycol_usuario = db.usuario
+    mycol_favoritos = db.favoritos  
+
     myquery = {"_id": usuario["_id"]}
-    result = mycol.delete_one(myquery)
+    result = mycol_usuario.delete_one(myquery)
     
     if result.deleted_count > 0:
         print(f"Usuário {usuario['nome']} {usuario['sobrenome']} deletado com sucesso.")
+        
+        favoritos_query = {"usuario_id": usuario["_id"]}
+        favoritos_result = mycol_favoritos.delete_many(favoritos_query)
+        
+        print(f"{favoritos_result.deleted_count} favoritos deletados para o usuário {usuario['nome']}.")
     else:
         print("Erro ao deletar o usuário.")

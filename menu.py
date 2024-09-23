@@ -3,7 +3,7 @@ from pymongo.server_api import ServerApi
 from usuario import create_usuario,read_usuario, update_usuario, delete_usuario
 from vendedor import create_vendedor, read_vendedor, update_vendedor, delete_vendedor
 from produto import create_produto, read_produto, update_produto, delete_produto
-from compra import comprar, listar_compras
+from compra import create_compra, listar_compras
 from favoritos import add_favorito, read_favorito, delete_favorito
 
 uri = "mongodb+srv://mercado-livre:12345@cluster0.ue92a.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
@@ -96,7 +96,7 @@ while (key != 'S'):
 
 
         if (sub == '1'):
-            comprar(db)  
+            create_compra(db)  
 
         elif (sub == '2'):
             listar_compras(db)
@@ -106,7 +106,7 @@ while (key != 'S'):
         print("Menu Favoritos")
         print("1-Adicionar produto no favoritos")
         print("2-Listar favoritos")
-        print("4-Deletar produto dos favoritos")
+        print("3-Deletar produto dos favoritos")
         sub = input("Digite a opção desejada? (V para voltar) ")
 
         if (sub == '1'):

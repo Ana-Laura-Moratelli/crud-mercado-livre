@@ -1,5 +1,4 @@
 import json
-from bson import ObjectId
 
 def listar_vendedor(db):
     mycol = db.vendedor
@@ -57,7 +56,6 @@ def read_vendedor(db):
         except ValueError:
             print("Entrada inválida. Digite um número.")
 
-    # Convertendo o ObjectId para string para exibição
     vendedor_selecionado['_id'] = str(vendedor_selecionado['_id'])
 
     print("Dados do vendedor selecionado:")
@@ -111,11 +109,19 @@ def delete_vendedor(db):
     if not vendedor:
         return
 
-    mycol = db.vendedor
+    mycol_vendedor = db.vendedor
+    mycol_produto = db.produto  
+
     myquery = {"_id": vendedor["_id"]}
-    result = mycol.delete_one(myquery)
+    result = mycol_vendedor.delete_one(myquery)
     
     if result.deleted_count > 0:
         print(f"Vendedor {vendedor['nome']} {vendedor['sobrenome']} deletado com sucesso.")
+        
+        produto_query = {"vendedor_id": vendedor["_id"]}
+        produtos_result = mycol_produto.delete_many(produto_query)
+        
+        print(f"{produtos_result.deleted_count} produtos relacionados ao vendedor foram deletados.")
     else:
         print(f"Vendedor {vendedor['nome']} {vendedor['sobrenome']} não encontrado.")
+
