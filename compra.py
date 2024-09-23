@@ -1,16 +1,15 @@
 from produto import listar_produtos
 from usuario import listar_usuarios
+from datetime import datetime
 
 def create_compra(db):
     mycol_compra = db.compra
     mycol_produto = db.produto
 
-    # Selecionar usuário
     usuario = listar_usuarios(db)
     if not usuario:
-        return  # Nenhum usuário selecionado
+        return  
 
-    # Listar produtos para selecionar
     produtos = listar_produtos(db)
     if not produtos:
         print("Nenhum produto disponível para registrar compra.")
@@ -27,7 +26,6 @@ def create_compra(db):
         except ValueError:
             print("Entrada inválida. Digite um número.")
 
-    # Verificar se o produto tem estoque suficiente
     quantidade_estoque = int(produto_selecionado["quantidade"])
 
     while True:
@@ -40,10 +38,11 @@ def create_compra(db):
             else:
                 break
         except ValueError:
-            print("Entrada inválida. Digite um número.")
+            print("Entrada inválida. Digite um número inteiro.")
 
     estado = input("Estado: ")
-    data_compra = input("Data da compra: ")
+
+    data_compra = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     compra = {
         "usuario_id": usuario["_id"], 
@@ -63,6 +62,7 @@ def create_compra(db):
 
     print(f"Compra registrada com sucesso. ID: {x.inserted_id}")
     print(f"Estoque atualizado. Quantidade restante: {nova_quantidade}")
+
 
 def listar_compras(db):
     mycol_compra = db.compra

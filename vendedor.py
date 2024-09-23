@@ -22,17 +22,34 @@ def listar_vendedor(db):
         except ValueError:
             print("Entrada inválida. Digite um número.")
 
+def validar_cpf(cpf):
+    """Valida se o CPF possui 11 dígitos numéricos."""
+    return cpf.isdigit() and len(cpf) == 11
+
+def cpf_existe(db, cpf):
+    """Verifica se o CPF já existe na coleção de vendedores."""
+    return db.vendedor.find_one({"cpf": cpf}) is not None
+
 def create_vendedor(db):
     mycol = db.vendedor
     print("\nInserindo um novo vendedor")
     nome = input("Nome: ")
     sobrenome = input("Sobrenome: ")
-    cpf = input("CPF: ")
+
+    while True:
+        cpf = input("CPF (11 dígitos): ")
+        if validar_cpf(cpf):
+            if not cpf_existe(db, cpf):
+                break
+            else:
+                print("CPF já existe. Tente um CPF diferente.")
+        else:
+            print("CPF inválido. Deve conter exatamente 11 números.")
 
     vendedor = {"nome": nome, "sobrenome": sobrenome, "cpf": cpf}
     x = mycol.insert_one(vendedor)
     print(f"Vendedor inserido com sucesso. ID: {x.inserted_id}")
-
+    
 def read_vendedor(db):
     mycol = db.vendedor
     vendedores = list(mycol.find())
@@ -91,10 +108,17 @@ def update_vendedor(db):
                 vendedor["sobrenome"] = novo_sobrenome
                 print("Sobrenome atualizado.")
         elif opcao == "3":
-            novo_cpf = input("Novo CPF: ")
-            if novo_cpf and novo_cpf != vendedor["cpf"]:
-                vendedor["cpf"] = novo_cpf
-                print("CPF atualizado.")
+            while True:
+                novo_cpf = input("Novo CPF (11 dígitos): ")
+                if validar_cpf(novo_cpf):
+                    if not cpf_existe(db, novo_cpf) or novo_cpf == vendedor["cpf"]:
+                        vendedor["cpf"] = novo_cpf
+                        print("CPF atualizado.")
+                        break
+                    else:
+                        print("CPF já existe. Tente um CPF diferente.")
+                else:
+                    print("CPF inválido. Deve conter exatamente 11 números.")
         elif opcao == "4":
             break
         else:

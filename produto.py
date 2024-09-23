@@ -26,19 +26,37 @@ def create_produto(db):
     
     nome = input("Nome: ")
     descricao = input("Descrição: ")
-    preco = input("Preço: ")
-    quantidade = input("Quantidade: ")
+
+    while True:
+        try:
+            preco = float(input("Preço: "))
+            if preco >= 0:
+                preco_formatado = f"{preco:.2f}"  
+                break
+            else:
+                print("Preço inválido. Deve ser maior ou igual a zero.")
+        except ValueError:
+            print("Entrada inválida. Digite um valor numérico para o preço.")
+    
+    while True:
+        try:
+            quantidade = int(input("Quantidade: "))
+            if quantidade >= 0:
+                break
+            else:
+                print("Quantidade inválida. Deve ser maior ou igual a zero.")
+        except ValueError:
+            print("Entrada inválida. Digite um número inteiro.")
 
     produto = {
         "nome": nome,
         "descricao": descricao,
-        "preco": preco,
+        "preco": preco_formatado,  
         "quantidade": quantidade,
         "vendedor_id": vendedor["_id"],  
-        "vendedor_nome": f"{vendedor['nome']} {vendedor['sobrenome']}" 
+        "vendedor_nome": f"{vendedor['nome']} {vendedor['sobrenome']}"
     }
 
-    
     x = mycol_produto.insert_one(produto)
     print(f"Produto inserido com sucesso. ID: {x.inserted_id}")
 
@@ -104,7 +122,8 @@ def update_produto(db):
         print("1. Alterar Nome")
         print("2. Alterar Descrição")
         print("3. Alterar Quantidade")
-        print("4. Sair")
+        print("4. Alterar Preço")
+        print("5. Sair")
 
         opcao = input("Digite o número da opção: ")
 
@@ -121,12 +140,32 @@ def update_produto(db):
                 print("Descrição atualizada.")
 
         elif opcao == "3":
-            nova_quantidade = input("Nova Quantidade: ")
-            if nova_quantidade:
-                produto_selecionado["quantidade"] = nova_quantidade
-                print("Quantidade atualizada.")
+            while True:
+                try:
+                    nova_quantidade = int(input("Nova Quantidade: "))
+                    if nova_quantidade >= 0:
+                        produto_selecionado["quantidade"] = nova_quantidade
+                        print("Quantidade atualizada.")
+                        break
+                    else:
+                        print("Quantidade inválida. Deve ser maior ou igual a zero.")
+                except ValueError:
+                    print("Entrada inválida. Digite um número inteiro.")
 
         elif opcao == "4":
+            while True:
+                try:
+                    novo_preco = float(input("Novo preço: "))
+                    if novo_preco >= 0:
+                        produto_selecionado["preco"] = f"{novo_preco:.2f}"
+                        print("Preço atualizado.")
+                        break
+                    else:
+                        print("Preço inválido. Deve ser maior ou igual a zero.")
+                except ValueError:
+                    print("Entrada inválida. Digite um valor numérico para o preço.")
+
+        elif opcao == "5":
             break
 
         else:
@@ -136,6 +175,7 @@ def update_produto(db):
     newvalues = {"$set": produto_selecionado}
     mycol_produto.update_one(myquery, newvalues)
     print("Produto atualizado com sucesso.")
+
 
 def delete_produto(db):
     produtos = listar_produtos(db)
