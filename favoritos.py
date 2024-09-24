@@ -1,33 +1,14 @@
 from produto import listar_produtos
-
-def selecionar_usuario(db):
-    mycol_usuario = db.usuario
-    usuarios = list(mycol_usuario.find())
-
-    if not usuarios:
-        print("Nenhum usuário encontrado.")
-        return None
-
-    print("\nLista de usuários:")
-    for i, usuario in enumerate(usuarios, 1):
-        print(f"{i}. {usuario['nome']} {usuario['sobrenome']} (ID: {usuario['_id']})")
-
-    while True:
-        try:
-            escolha = int(input("Digite o número do usuário que deseja selecionar: "))
-            if 1 <= escolha <= len(usuarios):
-                return usuarios[escolha - 1] 
-            else:
-                print("Número inválido. Tente novamente.")
-        except ValueError:
-            print("Entrada inválida. Digite um número.")
+from usuario import listar_usuarios
+from bson import ObjectId
 
 def add_favorito(db):
-    usuario = selecionar_usuario(db)
+    usuario = listar_usuarios(db)
     if not usuario:
         return  
 
     mycol_favoritos = db.favoritos
+    mycol_usuarios = db.usuario  
 
     produtos = listar_produtos(db)
     if not produtos:
@@ -51,15 +32,27 @@ def add_favorito(db):
         return
 
     favorito = {
-        "usuario_id": usuario["_id"],
-        "produto_id": produto_selecionado["_id"]
+        "usuario_id": ObjectId(usuario["_id"]),
+        "produto_id": ObjectId(produto_selecionado["_id"]),
+        "nome": produto_selecionado["nome"]
     }
-
     x = mycol_favoritos.insert_one(favorito)
-    print(f"Produto adicionado aos favoritos com sucesso. ID: {x.inserted_id}")
+
+    mycol_usuarios.update_one(
+        {"_id": ObjectId(usuario["_id"])},
+        {"$addToSet": {
+            "favoritos": {
+                "produto_id": str(produto_selecionado["_id"]),
+                "nome": produto_selecionado["nome"],
+                "_id": str(x.inserted_id)  
+            }
+        }}
+    )
+
+    print(f"Produto '{produto_selecionado['nome']}' adicionado aos favoritos com sucesso.")
 
 def read_favorito(db):
-    usuario = selecionar_usuario(db)
+    usuario = listar_usuarios(db)
     if not usuario:
         return  
 
@@ -82,13 +75,14 @@ def read_favorito(db):
 
 
 def delete_favorito(db):
-    usuario = selecionar_usuario(db)
+    usuario = listar_usuarios(db)
     if not usuario:
         print("Nenhum usuário encontrado.")
         return  
 
     mycol_favoritos = db.favoritos
     mycol_produto = db.produto
+    mycol_usuario = db.usuario  
 
     favoritos = list(mycol_favoritos.find({"usuario_id": usuario["_id"]}))  
 
@@ -116,7 +110,14 @@ def delete_favorito(db):
             print("Entrada inválida. Digite um número.")
 
     resultado = mycol_favoritos.delete_one({"usuario_id": usuario["_id"], "produto_id": favorito_selecionado["produto_id"]})
+    
     if resultado.deleted_count > 0:
         print(f"Produto removido dos favoritos com sucesso.")
+        
+        mycol_usuario.update_one(
+            {"_id": usuario["_id"]},
+            {"$pull": {"favoritos": {"produto_id": str(favorito_selecionado["produto_id"])}}}
+        )
+        print("Favorito removido também no documento do usuário.")
     else:
         print(f"Produto não encontrado nos favoritos.")

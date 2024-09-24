@@ -1,4 +1,5 @@
 import json
+from bson.objectid import ObjectId
 
 def listar_usuarios(db):
     mycol = db.usuario
@@ -125,8 +126,11 @@ def create_usuario(db):
 
 def read_usuario(db):
     mycol = db.usuario
+    mycol_produto = db.produto
+    mycol_compra = db.compra
+
     usuarios = list(mycol.find())
-    
+
     if not usuarios:
         print("Nenhum usuário encontrado.")
         return None
@@ -146,7 +150,54 @@ def read_usuario(db):
         except ValueError:
             print("Entrada inválida. Digite um número.")
 
-    usuario_selecionado['_id'] = str(usuario_selecionado['_id'])
+    def convert_objectid(data):
+        if isinstance(data, ObjectId):
+            return str(data)
+        elif isinstance(data, dict):
+            return {k: convert_objectid(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [convert_objectid(i) for i in data]
+        else:
+            return data
+
+    favoritos_ids = usuario_selecionado.get("favoritos", [])
+    favoritos_detalhes = []
+    
+    if favoritos_ids:
+        valid_favoritos_ids = []
+        for fav in favoritos_ids:
+            if isinstance(fav, dict) and 'produto_id' in fav:
+                valid_favoritos_ids.append(fav['produto_id'])
+            else:
+                print(f"ID inválido encontrado nos favoritos: {fav}")
+
+        if valid_favoritos_ids:
+            favoritos_produtos = list(mycol_produto.find({"_id": {"$in": [ObjectId(fav_id) for fav_id in valid_favoritos_ids]}}))
+            favoritos_detalhes = [{"produto_id": str(produto["_id"]), "nome": produto["nome"]} for produto in favoritos_produtos]
+
+    usuario_selecionado["favoritos"] = favoritos_detalhes
+
+    compras_usuario = list(mycol_compra.find({"usuario_id": usuario_selecionado["_id"]}))
+    compras_detalhadas = []
+    
+    for compra in compras_usuario:
+        produto = mycol_produto.find_one({"_id": ObjectId(compra["produto_id"])})
+        if produto:
+            compra_detalhe = {
+                "produto_id": str(produto["_id"]),
+                "nome_produto": produto["nome"],
+                "quantidade": compra["quantidade"],
+                "estado": compra["estado"],
+                "data_compra": compra["data_compra"],
+                "_id": str(compra["_id"])
+            }
+            compras_detalhadas.append(compra_detalhe)
+        else:
+            print(f"Produto não encontrado para a compra: {compra}")
+
+    usuario_selecionado["compras"] = compras_detalhadas
+
+    usuario_selecionado = convert_objectid(usuario_selecionado)
 
     print("Dados do usuário selecionado:")
     print(json.dumps(usuario_selecionado, indent=4))
@@ -280,10 +331,10 @@ def update_usuario(db):
                                     print("Número do cartão inválido. Tente novamente.")
                         elif opcao_cartao == "2":
                             validade = input("Nova Validade (MM/AA): ")
-                            card["validade"] = validade  # Adicionar validação se necessário
+                            card["validade"] = validade  
                         elif opcao_cartao == "3":
                             cvc = input("Novo CVC (3 dígitos): ")
-                            card["cvc"] = cvc  # Adicionar validação se necessário
+                            card["cvc"] = cvc  
                         elif opcao_cartao == "4":
                             break
                         else:

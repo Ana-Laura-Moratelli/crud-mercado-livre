@@ -1,4 +1,5 @@
 import json
+from bson.objectid import ObjectId
 
 def listar_vendedor(db):
     mycol = db.vendedor
@@ -51,8 +52,10 @@ def create_vendedor(db):
     print(f"Vendedor inserido com sucesso. ID: {x.inserted_id}")
     
 def read_vendedor(db):
-    mycol = db.vendedor
-    vendedores = list(mycol.find())
+    mycol_vendedor = db.vendedor
+    mycol_produto = db.produto
+
+    vendedores = list(mycol_vendedor.find())
 
     if not vendedores:
         print("Nenhum vendedor encontrado.")
@@ -75,8 +78,26 @@ def read_vendedor(db):
 
     vendedor_selecionado['_id'] = str(vendedor_selecionado['_id'])
 
+    produtos_vendedor = list(mycol_produto.find({"vendedor_id": ObjectId(vendedor_selecionado['_id'])}))
+
+    produtos_detalhes = []
+    if produtos_vendedor:
+        for produto in produtos_vendedor:
+            produtos_detalhes.append({
+                "produto_id": str(produto["_id"]),
+                "nome": produto["nome"],
+                "descricao": produto["descricao"],
+                "quantidade": produto["quantidade"]
+            })
+    else:
+        print("Nenhum produto encontrado para o vendedor.")
+
+    vendedor_selecionado['produtos'] = produtos_detalhes
+
     print("Dados do vendedor selecionado:")
     print(json.dumps(vendedor_selecionado, indent=4))
+
+    return vendedor_selecionado
 
 def update_vendedor(db):
     vendedor = listar_vendedor(db)

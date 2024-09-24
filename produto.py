@@ -17,6 +17,7 @@ def listar_produtos(db):
 
 def create_produto(db):
     mycol_produto = db.produto
+    mycol_vendedor = db.vendedor  
 
     print("\nInserindo um novo produto")
 
@@ -60,6 +61,17 @@ def create_produto(db):
     x = mycol_produto.insert_one(produto)
     print(f"Produto inserido com sucesso. ID: {x.inserted_id}")
 
+    mycol_vendedor.update_one(
+        {"_id": vendedor["_id"]},
+        {"$push": {"produtos": {
+            "produto_id": str(x.inserted_id),
+            "nome": nome,
+            "descricao": descricao,
+            "quantidade": quantidade
+        }}}
+    )
+
+
 def read_produto(db):
     mycol_produto = db.produto
     mycol_vendedor = db.vendedor
@@ -99,6 +111,8 @@ def read_produto(db):
 
 def update_produto(db):
     mycol_produto = db.produto
+    mycol_favoritos = db.favoritos  
+    mycol_vendedor = db.vendedor  
 
     produtos = listar_produtos(db)
     if not produtos:
@@ -174,6 +188,28 @@ def update_produto(db):
     myquery = {"_id": produto_selecionado["_id"]}
     newvalues = {"$set": produto_selecionado}
     mycol_produto.update_one(myquery, newvalues)
+    
+    mycol_favoritos.update_many(
+        {"produto_id": produto_selecionado["_id"]},
+        {"$set": {
+            "nome": produto_selecionado["nome"],
+            "descricao": produto_selecionado["descricao"],
+            "quantidade": produto_selecionado["quantidade"],
+            "preco": produto_selecionado["preco"]
+        }}
+    )
+
+    mycol_vendedor.update_one(
+        {"_id": produto_selecionado["vendedor_id"]},
+        {"$set": {
+            "produtos.$[elem].nome": produto_selecionado["nome"],
+            "produtos.$[elem].descricao": produto_selecionado["descricao"],
+            "produtos.$[elem].quantidade": produto_selecionado["quantidade"],
+            "produtos.$[elem].preco": produto_selecionado["preco"]
+        }},
+        array_filters=[{"elem.produto_id": str(produto_selecionado["_id"])}]
+    )
+
     print("Produto atualizado com sucesso.")
 
 
@@ -195,10 +231,19 @@ def delete_produto(db):
             print("Entrada inválida. Digite um número.")
 
     mycol_produto = db.produto
+    mycol_vendedor = db.vendedor  
     myquery = {"_id": produto_selecionado["_id"]}
+
     result = mycol_produto.delete_one(myquery)
-    
+
     if result.deleted_count > 0:
         print(f"Produto {produto_selecionado['nome']} deletado com sucesso.")
+
+        mycol_vendedor.update_one(
+            {"_id": produto_selecionado["vendedor_id"]},
+            {"$pull": {"produtos": {"produto_id": str(produto_selecionado["_id"])}}}  
+        )
+
+        print(f"O produto {produto_selecionado['nome']} também foi removido da lista do vendedor.")
     else:
         print(f"Produto {produto_selecionado['nome']} não encontrado.")
