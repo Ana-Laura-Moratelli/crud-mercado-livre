@@ -1,4 +1,5 @@
 import json
+import bcrypt
 from bson.objectid import ObjectId
 
 def listar_usuarios(db):
@@ -27,10 +28,6 @@ def validar_cpf(cpf):
     """Valida se o CPF possui 11 dígitos numéricos."""
     return cpf.isdigit() and len(cpf) == 11
 
-def cpf_existe(db, cpf):
-    """Verifica se o CPF já existe na coleção de usuários."""
-    return db.usuario.find_one({"cpf": cpf}) is not None
-
 def validar_cartao(numero, validade, cvc):
     """Valida o número do cartão, validade e CVC."""
     return (numero.isdigit() and len(numero) == 16 and
@@ -47,12 +44,40 @@ def validar_cep(cep):
     """Valida se o CEP possui 8 dígitos numéricos."""
     return cep.isdigit() and len(cep) == 8
 
+def cpf_existe(db, cpf):
+    """Verifica se o CPF já existe na coleção de usuários."""
+    return db.usuario.find_one({"cpf": cpf}) is not None
+
+def username_existe(db, username):
+    return db.usuario.find_one({"username": username}) is not None
+
+def create_senha():
+    while True:
+        senha = input("Crie uma senha (mínimo 8 caracteres, incluindo letras e números): ")
+        if len(senha) >= 8 and any(char.isdigit() for char in senha) and any(char.isalpha() for char in senha):
+            senha_confirma = input("Confirme a senha: ")
+            if senha == senha_confirma:
+                senha_hashed = bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt())
+                return senha_hashed
+            else:
+                print("As senhas não coincidem. Tente novamente.")
+        else:
+            print("A senha deve ter no mínimo 8 caracteres e incluir letras e números.")
+
 def create_usuario(db):
     mycol = db.usuario
     print("\nInserindo um novo usuário")
-    
     nome = input("Nome: ")
     sobrenome = input("Sobrenome: ")
+    
+    while True:
+        username = input("Username: ")
+        if not username_existe(db, username):
+            break
+        else:
+            print("Username já cadastrado. Tente novamente com outro.")
+
+    senha = create_senha()
     
     while True:
         cpf = input("CPF (11 dígitos): ")
@@ -61,6 +86,7 @@ def create_usuario(db):
         else:
             print("CPF inválido ou já cadastrado. Tente novamente.")
 
+    # Cadastro de Endereço
     enderecos = []
     while True:
         print("Cadastro de Endereço:")
@@ -72,7 +98,7 @@ def create_usuario(db):
         bairro = input("Bairro: ")
         cidade = input("Cidade: ")
         estado = input("Estado: ")
-        
+
         while True:
             cep = input("CEP (8 dígitos): ")
             if validar_cep(cep):
@@ -94,6 +120,7 @@ def create_usuario(db):
         if key == 'N':
             break
 
+    # Cadastro  Cartões
     cartoes = []
     while True:
         print("Cadastro de Cartão:")
@@ -120,7 +147,15 @@ def create_usuario(db):
         if key == 'N':
             break
 
-    usuario = {"nome": nome, "sobrenome": sobrenome, "cpf": cpf, "enderecos": enderecos, "cartoes": cartoes}
+    usuario = {
+        "nome": nome, 
+        "sobrenome": sobrenome, 
+        "username": username, 
+        "senha": senha,  
+        "cpf": cpf, 
+        "enderecos": enderecos, 
+        "cartoes": cartoes
+    }
     x = mycol.insert_one(usuario)
     print("Usuário inserido com sucesso. ID:", x.inserted_id)
 
@@ -157,12 +192,14 @@ def read_usuario(db):
             return {k: convert_objectid(v) for k, v in data.items()}
         elif isinstance(data, list):
             return [convert_objectid(i) for i in data]
+        elif isinstance(data, bytes):
+            return data.decode("utf-8", "ignore")  
         else:
             return data
 
     favoritos_ids = usuario_selecionado.get("favoritos", [])
     favoritos_detalhes = []
-    
+
     if favoritos_ids:
         valid_favoritos_ids = []
         for fav in favoritos_ids:
@@ -179,7 +216,7 @@ def read_usuario(db):
 
     compras_usuario = list(mycol_compra.find({"usuario_id": usuario_selecionado["_id"]}))
     compras_detalhadas = []
-    
+
     for compra in compras_usuario:
         produto = mycol_produto.find_one({"_id": ObjectId(compra["produto_id"])})
         if produto:
@@ -202,6 +239,40 @@ def read_usuario(db):
     print("Dados do usuário selecionado:")
     print(json.dumps(usuario_selecionado, indent=4))
 
+def uptade_senha(usuario):
+    print("Atualização de Senha:")
+    while True:
+        senha_atual = input("Digite a senha atual: ")
+        if bcrypt.checkpw(senha_atual.encode('utf-8'), usuario["senha"]):
+            while True:
+                nova_senha = input("Nova Senha (mínimo 8 caracteres, incluindo letras e números): ")
+                if len(nova_senha) >= 8 and any(char.isdigit() for char in nova_senha) and any(char.isalpha() for char in nova_senha):
+                    confirma_senha = input("Confirme a nova senha: ")
+                    if nova_senha == confirma_senha:
+                        usuario["senha"] = bcrypt.hashpw(nova_senha.encode('utf-8'), bcrypt.gensalt())
+                        print("Senha atualizada com sucesso.")
+                        return usuario
+                    else:
+                        print("As senhas não coincidem. Tente novamente.")
+                else:
+                    print("A senha deve ter no mínimo 8 caracteres e incluir letras e números.")
+        else:
+            print("Senha atual incorreta. Tente novamente.")
+
+def uptade_username(db, usuario):
+    print("Atualização de Username:")
+    while True:
+        novo_username = input("Digite o novo Username: ")
+        if novo_username and novo_username != usuario["username"]:
+            if not username_existe(db, novo_username):
+                usuario["username"] = novo_username
+                print("Username atualizado com sucesso.")
+                return usuario
+            else:
+                print("Username já está em uso. Tente outro.")
+        else:
+            print("Novo username não pode ser o mesmo que o atual ou vazio.")
+    
 def update_usuario(db):
     usuario = listar_usuarios(db)
     if not usuario:
@@ -219,7 +290,9 @@ def update_usuario(db):
         print("3. Alterar CPF")
         print("4. Alterar Endereços")
         print("5. Alterar Cartões")
-        print("6. Sair")
+        print("6. Alterar Username")
+        print("7. Alterar Senha")
+        print("8. Sair")
 
         opcao = input("Digite o número da opção: ")
 
@@ -344,6 +417,10 @@ def update_usuario(db):
                 else:
                     print("Cartão inválido.")
         elif opcao == "6":
+            usuario = uptade_username(db, usuario)
+        elif opcao == "7":
+            usuario = uptade_senha(usuario)
+        elif opcao == "8":
             break
         else:
             print("Opção inválida. Tente novamente.")
