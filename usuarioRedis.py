@@ -205,15 +205,15 @@ def sincronizar_cartao_mongo_para_redis(db, r, usuario_logado):
 
 def adicionar_cartao_redis(r, usuario_logado):
     numero_cartao = input("Número do Cartão: ")
-    nome_titular = input("Nome do Titular: ")
+    nome_card = input("Nome do Titular: ")
     validade = input("Validade (MM/AA): ")
-    cvv = input("CVV: ")
+    cvc = input("cvc: ")
 
     cartao = {
         'numero_cartao': numero_cartao,
-        'nome_titular': nome_titular,
+        'nome_card': nome_card,
         'validade': validade,
-        'cvv': cvv
+        'cvc': cvc
     }
 
     r.hset(f"usuario:{usuario_logado}:cartoes", numero_cartao, json.dumps(cartao))
@@ -231,8 +231,8 @@ def editar_cartao_redis(r, usuario_logado):
     for i, (numero_cartao, cartao_json) in enumerate(cartoes.items()):
         cartao = json.loads(cartao_json)
         print(f"{i + 1}. Número: {numero_cartao.decode('utf-8')}, "
-              f"Titular: {cartao['nome_titular']}, "  
-              f"Validade: {cartao['validade']}, CVV: {cartao['cvv']}")
+              f"Titular: {cartao['nome_card']}, "  
+              f"Validade: {cartao['validade']}, cvc: {cartao['cvc']}")
 
     indice = int(input("Escolha o índice do cartão que deseja alterar: ")) - 1
 
@@ -248,7 +248,7 @@ def editar_cartao_redis(r, usuario_logado):
         print("1. Alterar Número do Cartão")
         print("2. Alterar Nome do Titular")
         print("3. Alterar Validade")
-        print("4. Alterar CVV")
+        print("4. Alterar cvc")
         print("5. Sair")
         
         escolha = input("Digite sua escolha: ")
@@ -261,15 +261,15 @@ def editar_cartao_redis(r, usuario_logado):
 
         elif escolha == '2':
             novo_nome = input("Digite o novo nome do titular: ")
-            cartao_selecionado['nome_titular'] = novo_nome 
+            cartao_selecionado['nome_card'] = novo_nome 
 
         elif escolha == '3':
             nova_validade = input("Digite a nova validade (MM/AA): ")
             cartao_selecionado['validade'] = nova_validade
 
         elif escolha == '4':
-            novo_cvc = input("Digite o novo CVV: ")
-            cartao_selecionado['cvv'] = novo_cvc
+            novo_cvc = input("Digite o novo cvc: ")
+            cartao_selecionado['cvc'] = novo_cvc
 
         elif escolha == '5':
             break
@@ -314,9 +314,14 @@ def listar_cartao_redis(r, usuario_logado):
     print("Cartões no Redis:")
     for idx, (numero, cartao_json) in enumerate(cartoes.items(), 1):
         cartao_decoded = json.loads(cartao_json)
+
+        # Acessando o campo corretamente como 'nomeCard'
+        nome_card = cartao_decoded.get('nome_card', 'N/A')
+        validade = cartao_decoded.get('validade', 'N/A')
+        cvc = cartao_decoded.get('cvc', 'N/A')
+
         print(f"{idx} - Número: {numero.decode('utf-8')}, "
-              f"Titular: {cartao_decoded['nome_titular']}, Validade: {cartao_decoded['validade']}, "
-              f"CVV: {cartao_decoded['cvv']}")
+              f"Titular: {nome_card}, Validade: {validade}, cvc: {cvc}")
 
 def sincronizar_cartao_redis_para_mongo(db, r, usuario_logado):
     mycol = db.usuario

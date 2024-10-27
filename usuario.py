@@ -108,7 +108,7 @@ def create_usuario(db):
 
         endereco = {
             "rua": rua,
-            "num": num,
+            "numero": numero,
             "bairro": bairro,
             "cidade": cidade,
             "estado": estado,
@@ -390,7 +390,8 @@ def update_usuario(db):
                         print("1. Alterar Número do Cartão")
                         print("2. Alterar Validade")
                         print("3. Alterar CVC")
-                        print("4. Sair")
+                        print("4. Alterar titular")
+                        print("5. Sair")
 
                         opcao_cartao = input("Digite o número da opção: ")
 
@@ -409,6 +410,9 @@ def update_usuario(db):
                             cvc = input("Novo CVC (3 dígitos): ")
                             card["cvc"] = cvc  
                         elif opcao_cartao == "4":
+                            nomeCard = input("Novo titular: ")
+                            card["nome_card"] = nomeCard  
+                        elif opcao_cartao == "5":
                             break
                         else:
                             print("Opção inválida. Tente novamente.")

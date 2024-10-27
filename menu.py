@@ -5,7 +5,7 @@ from vendedor import create_vendedor, read_vendedor, update_vendedor, delete_ven
 from produto import create_produto, read_produto, update_produto, delete_produto
 from compra import create_compra, listar_compras
 from favoritos import add_favorito, read_favorito, delete_favorito
-from redis import sincronizar_endereco_mongo_para_redis, adicionar_endereco_redis, editar_endereco_redis, remover_endereco_redis, listar_endereco_redis, sincronizar_endereco_redis_para_mongo, sincronizar_cartao_mongo_para_redis, adicionar_cartao_redis, editar_cartao_redis, remover_cartao_redis, listar_cartao_redis, sincronizar_cartao_redis_para_mongo
+from usuarioRedis import sincronizar_endereco_mongo_para_redis, adicionar_endereco_redis, editar_endereco_redis, remover_endereco_redis, listar_endereco_redis, sincronizar_endereco_redis_para_mongo, sincronizar_cartao_mongo_para_redis, adicionar_cartao_redis, editar_cartao_redis, remover_cartao_redis, listar_cartao_redis, sincronizar_cartao_redis_para_mongo
 
 import bcrypt
 import redis
@@ -24,6 +24,10 @@ db = client.mercadolivre
 
 key = ''
 sub = ''
+
+def confirmar_saida():
+    confirmacao = input("Tem certeza que deseja sair? (S para confirmar, N para cancelar) ").lower()
+    return confirmacao == 's' or  confirmacao == 'S'
 
 def login_usuario(db, r):
     mycol = db.usuario
@@ -77,7 +81,20 @@ while key != 'S':
         print("6-Redis Endereço")
         print("7-Redis Cartão")
 
-        key = input("Digite a opção desejada? (S para sair) ")
+        key = input("Digite a opção desejada? (S para sair) ").upper()
+
+        if key == 'S' and usuario_logado:
+            if confirmar_saida():
+                break
+            else:
+                key = ''
+                continue
+
+        usuario_logado = verificar_sessao(r, token)
+        if not usuario_logado:
+            print("Sessão expirada. Faça login novamente.")
+            token = None
+            continue
 
         usuario_logado = verificar_sessao(r, token)
         if not usuario_logado:
