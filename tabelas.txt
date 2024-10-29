@@ -1,0 +1,35 @@
+CREATE TABLE IF NOT EXISTS usuarios (
+    id UUID PRIMARY KEY,
+    email text,
+    nome text,
+    sobrenome text,
+    username text,
+    senha text,
+    cpf text
+);
+
+CREATE TABLE IF NOT EXISTS vendedores (
+    id UUID PRIMARY KEY,
+    nome text,
+    sobrenome text,
+    cpf text
+);
+
+CREATE TABLE IF NOT EXISTS produtos (
+    id UUID PRIMARY KEY,
+    nome text,
+    descricao text,
+    preco decimal,
+    quantidade int,
+    vendedor_id UUID
+);
+
+CREATE TABLE IF NOT EXISTS compras (
+    id UUID PRIMARY KEY,
+    produto_id UUID,
+    nome_produto text,
+    quantidade int,
+    estado text,
+    data_compra timestamp,
+    usuario_id UUID
+);
