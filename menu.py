@@ -28,7 +28,18 @@ def listar_usuarios(tx):
     return [record["u"] for record in result]
 
 def criar_vendedor(tx, nome, sobrenome, cpf):
-    query = """
+
+    query_verificacao = """
+    MATCH (v:Vendedor {cpf: $cpf})
+    RETURN v
+    """
+    result_verificacao = tx.run(query_verificacao, cpf=cpf)
+    vendedor_existente = result_verificacao.single()
+
+    if vendedor_existente:
+        return None
+
+    query_criacao = """
     CREATE (v:Vendedor {
         nome: $nome,
         sobrenome: $sobrenome,
@@ -36,8 +47,8 @@ def criar_vendedor(tx, nome, sobrenome, cpf):
     })
     RETURN v
     """
-    result = tx.run(query, nome=nome, sobrenome=sobrenome, cpf=cpf)
-    return result.single()
+    result_criacao = tx.run(query_criacao, nome=nome, sobrenome=sobrenome, cpf=cpf)
+    return result_criacao.single()
 
 def listar_vendedores(tx):
     query = "MATCH (v:Vendedor) RETURN v"
@@ -49,21 +60,19 @@ def listar_vendedores_com_indices(tx):
     result = tx.run(query)
     return [record["v"] for record in result]
 
-def criar_produto(tx, nome, descricao, preco, vendedor_id):
+def criar_produto(tx, nome, descricao, preco, vendedor_cpf):
     query = """
-    MATCH (v:Vendedor)
-    WHERE ID(v) = $vendedor_id
-    CREATE (p:Produto {
-        nome: $nome,
-        descricao: $descricao,
-        preco: $preco
-    })-[:VENDIDO_POR]->(v)
-    RETURN p, v
+        MATCH (v:Vendedor {cpf: $vendedor_cpf})
+        CREATE (p:Produto {
+            nome: $nome,
+            descricao: $descricao,
+            preco: $preco
+        })-[:VENDIDO_POR]->(v)
+        RETURN p, v
     """
-    result = tx.run(query, nome=nome, descricao=descricao, preco=preco, vendedor_id=vendedor_id)
-    return result.single()
+    return tx.run(query, nome=nome, descricao=descricao, preco=preco, vendedor_cpf=vendedor_cpf).single()
 
-def listar_produtos(tx):
+def listar_produtos_para_compra(tx):
     query = """
     MATCH (p:Produto)-[:VENDIDO_POR]->(v:Vendedor)
     RETURN p, v
@@ -71,8 +80,7 @@ def listar_produtos(tx):
     result = tx.run(query)
     return [{"produto": record["p"], "vendedor": record["v"]} for record in result]
 
-
-def listar_produtos_para_compra(tx):
+def listar_produtos(tx):
     query = """
     MATCH (p:Produto)-[:VENDIDO_POR]->(v:Vendedor)
     RETURN p, v
@@ -84,7 +92,7 @@ def criar_compra(tx, produto_id, usuario_id, quantidade, estado):
     data_compra = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     query = """
     MATCH (p:Produto), (u:Usuario)
-    WHERE ID(p) = $produto_id AND ID(u) = $usuario_id
+    WHERE elementId(p) = $produto_id AND elementId(u) = $usuario_id
     CREATE (u)-[:COMPROU]->(c:Compra {
         quantidade: $quantidade,
         estado: $estado,
@@ -95,6 +103,8 @@ def criar_compra(tx, produto_id, usuario_id, quantidade, estado):
     result = tx.run(query, produto_id=produto_id, usuario_id=usuario_id,
                     quantidade=quantidade, estado=estado, data_compra=data_compra)
     return result.single()
+
+
 
 def listar_compras(tx):
     query = """
@@ -120,7 +130,7 @@ def registrar_compra(session):
         escolha_produto = input("Digite o número correspondente ao produto: ")
         if escolha_produto.isdigit() and 1 <= int(escolha_produto) <= len(produtos):
             produto_escolhido = produtos[int(escolha_produto) - 1]["produto"]
-            produto_id = produto_escolhido.id
+            produto_id = produto_escolhido.element_id  
             break
         else:
             print("Opção inválida. Por favor, tente novamente.")
@@ -138,7 +148,7 @@ def registrar_compra(session):
         escolha_usuario = input("Digite o número correspondente ao usuário: ")
         if escolha_usuario.isdigit() and 1 <= int(escolha_usuario) <= len(usuarios):
             usuario_escolhido = usuarios[int(escolha_usuario) - 1]
-            usuario_id = usuario_escolhido.id
+            usuario_id = usuario_escolhido.element_id 
             break
         else:
             print("Opção inválida. Por favor, tente novamente.")
@@ -154,14 +164,18 @@ def registrar_compra(session):
     estado = input("Digite o estado da compra (ex: 'Em processamento', 'Enviado', 'Concluído'): ")
 
     try:
-        result = session.write_transaction(
+        result = session.execute_write(
             criar_compra, produto_id, usuario_id, quantidade, estado
         )
-        compra = result["c"]
-        data_compra = compra["data_compra"].iso_format()
-        print(f"Compra registrada com sucesso em {data_compra}!")
+        if result:
+            compra = result["c"]
+            data_compra = compra["data_compra"].iso_format()
+            print(f"Compra registrada com sucesso em {data_compra}!")
+        else:
+            print("Erro ao registrar compra: Não foi possível criar a compra.")
     except Exception as e:
         print(f"Erro ao registrar compra: {e}")
+
 
 def listar_todas_compras(session):
     try:
@@ -183,7 +197,7 @@ def listar_todas_compras(session):
 def adicionar_favorito(tx, usuario_id, produto_id):
     query = """
     MATCH (u:Usuario), (p:Produto)
-    WHERE ID(u) = $usuario_id AND ID(p) = $produto_id
+    WHERE elementId(u) = $usuario_id AND elementId(p) = $produto_id
     CREATE (u)-[:FAVORITOU]->(f:Favorito {data_favorito: datetime()})-[:REFERENCIA]->(p)
     RETURN f, u, p
     """
@@ -191,14 +205,6 @@ def adicionar_favorito(tx, usuario_id, produto_id):
     return result.single()
 
 
-def listar_favoritos(tx, usuario_id):
-    query = """
-    MATCH (u:Usuario)-[:FAVORITOU]->(p:Produto)
-    WHERE ID(u) = $usuario_id
-    RETURN p
-    """
-    result = tx.run(query, usuario_id=usuario_id)
-    return [record["p"] for record in result]
 
 def adicionar_produto_aos_favoritos(session):
     produtos = session.execute_write(listar_produtos)
@@ -216,7 +222,7 @@ def adicionar_produto_aos_favoritos(session):
         escolha_produto = input("Digite o número correspondente ao produto: ")
         if escolha_produto.isdigit() and 1 <= int(escolha_produto) <= len(produtos):
             produto_escolhido = produtos[int(escolha_produto) - 1]["produto"]
-            produto_id = produto_escolhido.id
+            produto_id = produto_escolhido.element_id 
             break
         else:
             print("Opção inválida. Por favor, tente novamente.")
@@ -234,20 +240,34 @@ def adicionar_produto_aos_favoritos(session):
         escolha_usuario = input("Digite o número correspondente ao usuário: ")
         if escolha_usuario.isdigit() and 1 <= int(escolha_usuario) <= len(usuarios):
             usuario_escolhido = usuarios[int(escolha_usuario) - 1]
-            usuario_id = usuario_escolhido.id
+            usuario_id = usuario_escolhido.element_id  
             break
         else:
             print("Opção inválida. Por favor, tente novamente.")
 
     try:
-        result = session.write_transaction(
+        result = session.execute_write(
             adicionar_favorito, usuario_id, produto_id
         )
-        produto = result["p"]
-        usuario = result["u"]
-        print(f"Produto '{produto['nome']}' adicionado aos favoritos do usuário {usuario['nome']} {usuario['sobrenome']}.")
+        if result:
+            produto = result["p"]
+            usuario = result["u"]
+            print(f"Produto '{produto['nome']}' adicionado aos favoritos do usuário {usuario['nome']} {usuario['sobrenome']}.")
+        else:
+            print("Erro ao adicionar favorito: Não foi possível criar o relacionamento.")
     except Exception as e:
         print(f"Erro ao adicionar favorito: {e}")
+
+
+def listar_favoritos(tx, usuario_id):
+    query = """
+    MATCH (u:Usuario)-[:FAVORITOU]->(f:Favorito)-[:REFERENCIA]->(p:Produto)
+    WHERE elementId(u) = $usuario_id
+    RETURN p
+    """
+    result = tx.run(query, usuario_id=usuario_id)
+    return [record["p"] for record in result]
+
 
 def listar_favoritos_do_usuario(session):
     usuarios = session.execute_write(listar_usuarios)
@@ -263,13 +283,16 @@ def listar_favoritos_do_usuario(session):
         escolha_usuario = input("Digite o número correspondente ao usuário: ")
         if escolha_usuario.isdigit() and 1 <= int(escolha_usuario) <= len(usuarios):
             usuario_escolhido = usuarios[int(escolha_usuario) - 1]
-            usuario_id = usuario_escolhido.id
+            usuario_id = usuario_escolhido.element_id  
             break
         else:
             print("Opção inválida. Por favor, tente novamente.")
 
     try:
+        print(f"Obtendo favoritos para o usuário com elementId: {usuario_id}")
+        
         favoritos = session.execute_write(listar_favoritos, usuario_id)
+        
         if favoritos:
             print(f"\nProdutos favoritos de {usuario_escolhido['nome']} {usuario_escolhido['sobrenome']}:")
             for produto in favoritos:
@@ -278,6 +301,7 @@ def listar_favoritos_do_usuario(session):
             print("Este usuário não possui produtos favoritos.")
     except Exception as e:
         print(f"Erro ao listar favoritos: {e}")
+
 
 def main():
     with GraphDatabase.driver(URI, auth=AUTH) as driver:
@@ -310,9 +334,16 @@ def main():
                         result = session.execute_write(
                             criar_usuario, email, nome, sobrenome, username, hashed_senha, cpf
                         )
-                        print(f"Usuário {result['u']['nome']} criado com sucesso!")
+                        
+                        if result:
+                            usuario = result["u"]
+                            usuario_id = usuario.element_id 
+                            print(f"Usuário '{usuario['nome']} {usuario['sobrenome']}' criado com sucesso com elementId: {usuario_id}")
+                        else:
+                            print("Erro: não foi possível criar o usuário.")
                     except Exception as e:
                         print(f"Erro ao criar usuário: {e}")
+
 
                 elif opcao == "2":
                     try:
@@ -329,15 +360,25 @@ def main():
                 elif opcao == "3":
                     nome = input("Digite o nome do vendedor: ")
                     sobrenome = input("Digite o sobrenome do vendedor: ")
-                    cpf = input("Digite o CPF do vendedor: ")
 
-                    try:
-                        result = session.execute_write(
-                            criar_vendedor, nome, sobrenome, cpf
-                        )
-                        print(f"Vendedor {result['v']['nome']} criado com sucesso!")
-                    except Exception as e:
-                        print(f"Erro ao criar vendedor: {e}")
+                    while True:
+                        cpf = input("Digite o CPF do vendedor: ")
+
+                        try:
+                            result = session.execute_write(
+                                criar_vendedor, nome, sobrenome, cpf
+                            )
+                            
+                            if result is None:
+                                print("Erro: CPF já cadastrado para outro vendedor. Por favor, tente novamente.")
+                            else:
+                                vendedor = result["v"]
+                                vendedor_id = vendedor.element_id  
+                                print(f"Vendedor '{vendedor['nome']}' criado com sucesso com elementId: {vendedor_id}")
+                                break  
+                        except Exception as e:
+                            print(f"Erro ao criar vendedor: {e}")
+
 
                 elif opcao == "4":
                     try:
@@ -352,41 +393,43 @@ def main():
                         print(f"Erro ao listar vendedores: {e}")
 
                 elif opcao == "5":
-                    nome = input("Digite o nome do produto: ")
-                    descricao = input("Digite a descrição do produto: ")
-                    try:
-                        preco = float(input("Digite o preço do produto: "))
-                    except ValueError:
-                        print("Preço inválido. Por favor, insira um número.")
-                        continue
+                        nome = input("Digite o nome do produto: ")
+                        descricao = input("Digite a descrição do produto: ")
+                        try:
+                            preco = float(input("Digite o preço do produto: "))
+                        except ValueError:
+                            print("Preço inválido. Por favor, insira um número.")
+                            continue
 
-                    vendedores = session.execute_write(listar_vendedores_com_indices)
-                    if not vendedores:
-                        print("Não há vendedores cadastrados. Cadastre um vendedor antes de criar um produto.")
-                        continue
+                        vendedores = session.execute_write(listar_vendedores_com_indices)
+                        if not vendedores:
+                            print("Não há vendedores cadastrados. Cadastre um vendedor antes de criar um produto.")
+                            continue
 
-                    print("\nSelecione o vendedor associado ao produto:")
-                    for idx, vendedor in enumerate(vendedores, start=1):
-                        print(f"{idx}. {vendedor['nome']} {vendedor['sobrenome']} (CPF: {vendedor['cpf']})")
+                        print("\nSelecione o vendedor associado ao produto:")
+                        for idx, vendedor in enumerate(vendedores, start=1):
+                            print(f"{idx}. {vendedor['nome']} {vendedor['sobrenome']} (CPF: {vendedor['cpf']})")
 
-                    while True:
-                        escolha = input("Digite o número correspondente ao vendedor: ")
-                        if escolha.isdigit() and 1 <= int(escolha) <= len(vendedores):
-                            vendedor_escolhido = vendedores[int(escolha) - 1]
-                            vendedor_id = vendedor_escolhido.id  
-                            break
-                        else:
-                            print("Opção inválida. Por favor, tente novamente.")
+                        while True:
+                            escolha = input("Digite o número correspondente ao vendedor: ")
+                            if escolha.isdigit() and 1 <= int(escolha) <= len(vendedores):
+                                vendedor_escolhido = vendedores[int(escolha) - 1]
+                                vendedor_cpf = vendedor_escolhido["cpf"] 
+                                break
+                            else:
+                                print("Opção inválida. Por favor, tente novamente.")
 
-                    try:
-                        result = session.write_transaction(
-                            criar_produto, nome, descricao, preco, vendedor_id
-                        )
-                        produto = result["p"]
-                        vendedor = result["v"]
-                        print(f"Produto '{produto['nome']}' criado e vinculado ao vendedor {vendedor['nome']} {vendedor['sobrenome']}.")
-                    except Exception as e:
-                        print(f"Erro ao criar produto: {e}")
+                        try:
+                            
+                            result = session.execute_write(
+                                criar_produto, nome, descricao, preco, vendedor_cpf
+                            )
+                            produto = result["p"]
+                            vendedor = result["v"]
+                            print(f"Produto '{produto['nome']}' criado e vinculado ao vendedor {vendedor['nome']} {vendedor['sobrenome']}.")
+                        except Exception as e:
+                            print(f"Erro ao criar produto: {e}")
+
 
                 elif opcao == "6":
                     try:
@@ -419,6 +462,6 @@ def main():
                     break
                 else:
                     print("Opção inválida. Por favor, tente novamente.")
-
+    
 if __name__ == "__main__":
     main()
