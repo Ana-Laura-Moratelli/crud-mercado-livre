@@ -5,10 +5,10 @@ import uuid
 from datetime import datetime
 
 cloud_config = {
-    'secure_connect_bundle': 'C:/Users/João/OneDrive/Área de Trabalho/FATEC/banco-de-dados/crud-python-cassandra/secure-connect-mercado-livre.zip'
+    'secure_connect_bundle': 'C:/caminho-pro-arquivo/secure-connect-mercado-livre.zip'
 }
 
-auth_provider = PlainTextAuthProvider(username='token', password='AstraCS:AnbxWDqsFhXjSxBjldnvMJzI:d99df865d6b5da57de9841d5905da123196305809ea9c91dfae761739c312de6')
+auth_provider = PlainTextAuthProvider(username='token', password='AstraCS:seutoken')
 cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
 session = cluster.connect()
 
